@@ -24,14 +24,14 @@ void set_vertexClr_from_bfsAdjList(typAdjList* adjlist, typVertexClr newClr);
 // BFS interface
 /*-------------------------------------*/
 
-bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex, 
+bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex,
 	typCmpResult(*graphCmpFunc)(const void* k1, const void* k2), List* distList)
 {
 	Queue todoList_Queue;
-	typAdjList* currAdjList = nullptr, * nextAdjList = nullptr;
-	typBfsVertex* currVertex = nullptr, * nextVertex = nullptr;
-	typSingleList_Node* currNode = nullptr, * setMember = nullptr;
-	Set* adjacentNode = nullptr;
+	typAdjList* peekedAdjList = nullptr, * neighborAdjList = nullptr, * firstAdjList = nullptr;
+	typBfsVertex* neighbor_nodeVertex = nullptr, * neighbor_setVertex = nullptr;
+	typSingleList_Node* setMember = nullptr;
+	Set* adjacentSet = nullptr;
 	int tempDist = 0;
 
 	if (myGraph == nullptr || startVertex == nullptr || distList == nullptr || graphCmpFunc == nullptr)
@@ -49,7 +49,7 @@ bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex,
 #endif
 		return false;
 	}
-	else if(BFS_WrappingFunc(myGraph) == false)													// 2. 인접리스트 노드 래핑작업
+	else if (BFS_WrappingFunc(myGraph) == false)													// 2. 인접리스트 노드 래핑작업
 	{
 #ifdef DEBUG
 		debugNumber_bfs = 3;
@@ -60,9 +60,9 @@ bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex,
 	else {}
 
 	BFS_initVertex(myGraph, startVertex, graphCmpFunc);											// 3. 래핑된 그래프의 모든 정점 초기화
-	
-	nextAdjList = BFS_find_AdjList(myGraph,startVertex, graphCmpFunc);							// 4. 시작정점의 인접리스트를 이벤트 큐에 삽입
-	if (nextAdjList == nullptr)
+
+	firstAdjList = BFS_find_AdjList(myGraph, startVertex, graphCmpFunc);							// 4. 시작정점의 인접리스트를 이벤트 큐에 삽입
+	if (firstAdjList == nullptr)
 	{
 		BFS_UnwrappingFunc(myGraph);
 #ifdef DEBUG
@@ -70,7 +70,7 @@ bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex,
 #endif
 		return false;
 	}
-	else if(todoList_Queue.enqueue(nextAdjList) == false)
+	else if (todoList_Queue.enqueue(firstAdjList) == false)
 	{
 		BFS_UnwrappingFunc(myGraph);
 #ifdef DEBUG
@@ -82,16 +82,16 @@ bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex,
 
 	while (todoList_Queue.getSize() > 0)	// 너비우선탐색 수행
 	{
-		currAdjList = (typAdjList*)todoList_Queue.peek();									// 5. 큐 맨앞의 인접리스트 가져오기
-		adjacentNode = &(currAdjList->Adjacents);
+		peekedAdjList = (typAdjList*)todoList_Queue.peek();									// 5. 큐 맨앞의 인접리스트 가져오기
+		adjacentSet = &(peekedAdjList->Adjacents);
 
-		for (setMember = (typSingleList_Node*)adjacentNode->begin(); setMember != nullptr;	// 6. 현재 인접리스트의 각 인접정점 순회
-			setMember = (typSingleList_Node*)adjacentNode->next(setMember))
+		for (setMember = (typSingleList_Node*)adjacentSet->begin(); setMember != nullptr;	// 6. 현재 인접리스트의 각 인접정점 순회
+			setMember = (typSingleList_Node*)adjacentSet->next(setMember))
 		{
-			nextVertex = (typBfsVertex*)setMember->data;									// 6-1. 엣지 집합에서 이웃정점(목적지) 하나 가져오기
+			neighbor_setVertex = (typBfsVertex*)setMember->data;									// 6-1. 엣지 집합에서 이웃정점(목적지) 하나 가져오기
 
-			nextAdjList = BFS_find_AdjList(myGraph, nextVertex, graphCmpFunc);					// 6-2. 위의 이웃정점의 인접리스트 집합 가져오기
-			if (nextAdjList == nullptr)
+			neighborAdjList = BFS_find_AdjList(myGraph, neighbor_setVertex, graphCmpFunc);					// 6-2. 위의 이웃정점의 인접리스트 집합 가져오기
+			if (neighborAdjList == nullptr)
 			{
 				todoList_Queue.init(graphCmpFunc, dummyFunc::print, dummyFunc::destroy);
 				BFS_UnwrappingFunc(myGraph);
@@ -102,20 +102,20 @@ bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex,
 			}
 			else
 			{
-				currVertex = (typBfsVertex*)nextAdjList->vertex;
+				neighbor_nodeVertex = (typBfsVertex*)neighborAdjList->vertex;
 
-				if (currVertex->color == WHITE)												// 6-3. 흰색 정점에 회색을 칠하기(큐에 들어간다는 표식)
+				if (neighbor_nodeVertex->color == WHITE)												// 6-3. 흰색 정점에 회색을 칠하기(큐에 들어간다는 표식)
 				{
-					currVertex->color = GRAY;
-					tempDist = get_vertexDist_from_bfsAdjList(currAdjList);
-					currVertex->dist = tempDist + 1;										// 6-4. 루프가 돌때마다 거리 +1
+					neighbor_nodeVertex->color = GRAY;
+					tempDist = get_vertexDist_from_bfsAdjList(peekedAdjList);
+					neighbor_nodeVertex->dist = tempDist + 1;										// 6-4. 루프가 돌때마다 거리 +1
 
-					if (todoList_Queue.enqueue(nextAdjList) == false)						// 6-5. 그 정점들의 인접리스트를 enqueue
+					if (todoList_Queue.enqueue(neighborAdjList) == false)						// 6-5. 그 정점들의 인접리스트를 enqueue
 					{
 						todoList_Queue.init(graphCmpFunc, dummyFunc::print, dummyFunc::destroy);
 						BFS_UnwrappingFunc(myGraph);
 #ifdef DEBUG
-						debugNumber_bfs =7;
+						debugNumber_bfs = 7;
 #endif
 						return false;
 					}
@@ -123,9 +123,9 @@ bool GraphAlgorithms::BFS::traverse(Graph* myGraph, typBfsVertex* startVertex,
 			}
 		}
 
-		if (todoList_Queue.dequeue((void**)&currAdjList) == true)							// 7. 현재 인접리스트를 dequeue 하여 검정색 칠하기 
+		if (todoList_Queue.dequeue((void**)&peekedAdjList) == true)							// 7. 현재 인접리스트를 dequeue 하여 검정색 칠하기 
 		{
-			set_vertexClr_from_bfsAdjList(currAdjList, BLACK);	// 큐에서 빠져나왔다는 표식	
+			set_vertexClr_from_bfsAdjList(peekedAdjList, BLACK);	// 큐에서 빠져나왔다는 표식	
 		}
 		else
 		{
